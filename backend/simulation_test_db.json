@@ -1,0 +1,58 @@
+{
+  "7f7fd3cc-016f-4cff-bb65-66fc42c97cc8": {
+    "media_id": "7f7fd3cc-016f-4cff-bb65-66fc42c97cc8",
+    "title": "Sample Video",
+    "uploader": "TestUser",
+    "object_key": "s3://bucket/video.mp4",
+    "status": "done",
+    "thumbnail_key": "s3://bucket/thumbs/video_thumb.jpg",
+    "created_at": "2026-04-21T18:22:23.860071",
+    "updated_at": "2026-04-21T18:22:23.877817",
+    "file_size": 1024000,
+    "media_type": "video",
+    "description": "A sample video for testing",
+    "error_message": null
+  },
+  "c1483c23-72b0-47f0-93a9-cf17f90887e7": {
+    "media_id": "c1483c23-72b0-47f0-93a9-cf17f90887e7",
+    "title": "Video for Processing",
+    "uploader": "ProcessorTest",
+    "object_key": "s3://bucket/process_me.mp4",
+    "status": "done",
+    "thumbnail_key": "s3://bucket/thumbs/process_me_thumb.jpg",
+    "created_at": "2026-04-21T18:22:23.879839",
+    "updated_at": "2026-04-21T18:22:23.882366",
+    "file_size": 2048000,
+    "media_type": "video",
+    "description": null,
+    "error_message": null
+  },
+  "2e0d3ce9-5251-4467-b18c-fa3990cb7c85": {
+    "media_id": "2e0d3ce9-5251-4467-b18c-fa3990cb7c85",
+    "title": "Error Test Media",
+    "uploader": "ErrorTestUser",
+    "object_key": "s3://bucket/error_test.mp4",
+    "status": "error",
+    "thumbnail_key": null,
+    "created_at": "2026-04-21T18:22:23.884567",
+    "updated_at": "2026-04-21T18:22:23.885736",
+    "file_size": 1000,
+    "media_type": "video",
+    "description": null,
+    "error_message": "Processing failed: Invalid file format"
+  },
+  "d0636432-ffc3-4a40-a7bb-1bca5314695f": {
+    "media_id": "d0636432-ffc3-4a40-a7bb-1bca5314695f",
+    "title": "My Vacation Video",
+    "uploader": "john_doe",
+    "object_key": "s3://bucket/vacation/video.mp4",
+    "status": "done",
+    "thumbnail_key": "s3://bucket/vacation/video_thumbnail.jpg",
+    "created_at": "2026-04-21T18:22:23.886670",
+    "updated_at": "2026-04-21T18:22:24.893152",
+    "file_size": 5242880,
+    "media_type": "video",
+    "description": "Beautiful sunset at the beach",
+    "error_message": null
+  }
+}
