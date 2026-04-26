@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Media Detail — MediaShare</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="media-list.html" aria-label="MediaShare home">
+    <span class="logo-mark" aria-hidden="true"></span>
+    <span class="nav-logo">MediaShare</span>
+  </a>
+  <div class="nav-links">
+    <a href="upload.html">Upload</a>
+    <a href="media-list.html" class="active">Library</a>
+  </div>
+</nav>
+
+<div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-relevant="additions"></div>
+
+<div class="container">
+  <div class="page-header page-header-row">
+    <div>
+      <h1 class="page-title" id="pageTitle">Media detail</h1>
+      <p class="page-sub" id="pageSub">Preview your upload and view key details in one place.</p>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-ghost text-sm" href="media-list.html">← Back</a>
+      <button type="button" class="btn btn-primary text-sm" id="refreshBtn" onclick="loadDetail()">
+        <span id="refreshIcon">↻</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <div id="errorState" style="display:none;" class="fade-in mt-2">
+    <div class="alert alert-error">
+      <span class="alert-icon">✕</span>
+      <div>
+        <strong>Failed to load media detail.</strong>
+        <span id="errorMsg"> Check that the API server is running.</span>
+        <br><span style="font-size:12px; opacity:0.7;">API: <span id="errorApi"></span></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="content" style="display:none;" class="fade-in">
+    <div class="detail-layout">
+      <div class="card">
+        <div class="kv-title" id="mediaTitle">—</div>
+        <div class="kv-sub" id="mediaMeta">—</div>
+
+        <div class="preview-frame mt-2" id="previewFrame" aria-label="Media preview">
+          <span class="text-muted" style="font-size:13px;">No preview</span>
+        </div>
+
+        <div class="mt-2" id="linksRow" style="display:none;">
+          <a class="link" id="openLink" href="#" target="_blank" rel="noreferrer">Open file →</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:1rem;">Details</div>
+
+        <div class="detail-row">
+          <span class="detail-key">Status</span>
+          <span class="detail-val" id="statusVal">—</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-key">Media ID</span>
+          <span class="id-chip" id="idChip" title="Click to copy" onclick="copyId()">—</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-key">Uploader</span>
+          <span class="detail-val" id="uploaderVal">—</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-key">Created</span>
+          <span class="detail-val" id="createdVal">—</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-key">Type</span>
+          <span class="detail-val" id="typeVal">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:5000'; // ← change to your API URL
+
+  const qs = new URLSearchParams(location.search);
+  const mediaId = qs.get('id');
+
+  let currentAbort = null;
+
+  if (!mediaId) {
+    showError(new Error('Missing media id in the URL (expected ?id=...)'));
+  } else {
+    loadDetail();
+  }
+
+  async function loadDetail() {
+    if (!mediaId) return;
+    setRefreshing(true);
+    hideError();
+
+    if (currentAbort) currentAbort.abort();
+    currentAbort = new AbortController();
+
+    try {
+      const data = await fetchDetail(mediaId, currentAbort.signal);
+      renderDetail(data);
+      document.getElementById('content').style.display = 'block';
+
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      showError(err);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  async function fetchDetail(id, signal) {
+    // Spec: GET /media?id=... should return a specific file or its metadata.
+    // We support both JSON and binary responses.
+    const url = `${API_BASE}/media?id=${encodeURIComponent(id)}`;
+    const res = await fetch(url, { signal });
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+    if (contentType.includes('application/json')) {
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || json.message || `Server returned ${res.status}`);
+      if (Array.isArray(json)) return json[0] || {};
+      return json.media || json.item || json.result || json;
+    }
+
+    if (!res.ok) {
+      // Try to get a JSON error body if any
+      const maybeJson = await res.json().catch(() => null);
+      throw new Error(maybeJson?.error || maybeJson?.message || `Server returned ${res.status}`);
+    }
+
+    // Binary file response
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    return {
+      id,
+      title: 'Media file',
+      status: 'done',
+      content_type: blob.type || '',
+      media_url: objectUrl
+    };
+  }
+
+  function renderDetail(m) {
+    const id = m.id || m.media_id || m.mediaId || mediaId;
+    const title = m.title || 'Untitled';
+    const status = (m.status || 'pending').toLowerCase();
+    const uploader = m.uploader || m.user || m.owner || '—';
+    const createdAt = m.created_at || m.createdAt || '';
+    const description = m.description || '';
+    const objectKey = m.object_key || m.objectKey || '';
+    const thumbKey = m.thumbnail_key || m.thumbnailKey || '';
+
+    const contentType = m.content_type || m.contentType || m.file_type || m.fileType || '';
+    const mediaUrl = m.media_url || m.mediaUrl || m.url || '';
+    const thumbUrl = m.thumbnail_url || m.thumbnailUrl || '';
+
+    document.getElementById('pageTitle').textContent = 'Media detail';
+    document.getElementById('mediaTitle').textContent = title;
+    document.getElementById('mediaMeta').textContent = `ID ${id} · ${formatDate(createdAt) || '—'}`;
+
+    // Status
+    document.getElementById('statusVal').innerHTML = statusBadge(status);
+
+    // Details
+    const chip = document.getElementById('idChip');
+    chip.textContent = id;
+    chip.dataset.id = id;
+
+    document.getElementById('uploaderVal').textContent = uploader;
+    document.getElementById('createdVal').textContent = formatDateTime(createdAt) || '—';
+    document.getElementById('typeVal').textContent = contentType || '—';
+
+    // Add optional metadata rows if present
+    upsertOptionalRow('descRow', 'Description', description);
+    upsertOptionalRow('objectKeyRow', 'Object key', objectKey);
+    upsertOptionalRow('thumbKeyRow', 'Thumbnail key', thumbKey);
+
+    // Preview
+    renderPreview({ title, contentType, mediaUrl, thumbUrl });
+
+    // Link
+    const linksRow = document.getElementById('linksRow');
+    if (mediaUrl) {
+      linksRow.style.display = 'block';
+      const a = document.getElementById('openLink');
+      a.href = mediaUrl;
+    } else {
+      linksRow.style.display = 'none';
+    }
+  }
+
+  function upsertOptionalRow(rowId, label, value) {
+    const card = document.querySelector('.detail-layout .card:last-child');
+    if (!card) return;
+
+    let row = document.getElementById(rowId);
+    if (!value) {
+      if (row) row.remove();
+      return;
+    }
+
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'detail-row';
+      row.id = rowId;
+      row.innerHTML = `<span class="detail-key"></span><span class="detail-val"></span>`;
+      card.appendChild(row);
+    }
+
+    row.querySelector('.detail-key').textContent = label;
+    row.querySelector('.detail-val').textContent = value;
+  }
+
+  function renderPreview({ title, contentType, mediaUrl, thumbUrl }) {
+    const frame = document.getElementById('previewFrame');
+    const isVideo = String(contentType).startsWith('video') || /\bvideo\b/i.test(String(contentType));
+    const isImage = String(contentType).startsWith('image') || /\bimage\b/i.test(String(contentType));
+
+    const src = mediaUrl || thumbUrl;
+
+    if (!src) {
+      frame.innerHTML = `<span class="text-muted" style="font-size:13px;">No preview available</span>`;
+      return;
+    }
+
+    if (isVideo && mediaUrl) {
+      frame.innerHTML = `<video controls preload="metadata" src="${escHtml(mediaUrl)}" aria-label="${escHtml(title)}"></video>`;
+      return;
+    }
+
+    // Default to image preview when possible
+    frame.innerHTML = `<img src="${escHtml(src)}" alt="${escHtml(title)}" loading="lazy" onerror="this.style.display='none'">`;
+  }
+
+  function statusBadge(status) {
+    const badgeClass = { pending:'badge-pending', processing:'badge-processing', done:'badge-done', error:'badge-error' }[status] || 'badge-pending';
+    return `<span class="badge ${badgeClass}">${escHtml(status)}</span>`;
+  }
+
+  function setRefreshing(on) {
+    document.getElementById('refreshIcon').textContent = on ? '…' : '↻';
+    document.getElementById('refreshBtn').disabled = on;
+  }
+
+  function showError(err) {
+    document.getElementById('errorState').style.display = 'block';
+    document.getElementById('errorMsg').textContent = ' ' + (err.message || 'Unknown error.');
+    document.getElementById('errorApi').textContent = API_BASE + '/media/' + (mediaId || '...');
+    document.getElementById('content').style.display = 'none';
+  }
+
+  function hideError() {
+    document.getElementById('errorState').style.display = 'none';
+  }
+
+  function copyId() {
+    const id = document.getElementById('idChip').dataset.id;
+    if (!id) return;
+    navigator.clipboard.writeText(id).then(() => showToast('success', 'ID copied!'));
+  }
+
+  function showToast(type, msg) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : '✕'}</span><span>${escHtml(msg)}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleDateString(); } catch { return ''; }
+  }
+
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleString(); } catch { return ''; }
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library — MediaShare</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="media-list.html" aria-label="MediaShare home">
+    <span class="logo-mark" aria-hidden="true"></span>
+    <span class="nav-logo">MediaShare</span>
+  </a>
+  <div class="nav-links">
+    <a href="upload.html">Upload</a>
+    <a href="media-list.html" class="active">Library</a>
+  </div>
+</nav>
+
+<div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-relevant="additions"></div>
+
+<div class="container">
+  <div class="page-header page-header-row">
+    <div>
+      <h1 class="page-title">Media library</h1>
+      <p class="page-sub">Browse uploads, preview thumbnails, and track processing status.</p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="btn btn-ghost text-sm" id="refreshBtn" onclick="loadMedia()" aria-label="Refresh media list">
+        <span id="refreshIcon">↻</span> Refresh
+      </button>
+      <a class="btn btn-primary text-sm" href="upload.html">+ Upload</a>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="card filter-bar">
+    <div class="filter-bar-inner">
+      <input type="text" id="searchInput" class="filter-input" placeholder="Search by title…" oninput="filterMedia()" autocomplete="off" spellcheck="false">
+      <div class="filter-group">
+        <button type="button" class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+        <button type="button" class="filter-btn" data-filter="pending" onclick="setFilter('pending', this)">Pending</button>
+        <button type="button" class="filter-btn" data-filter="processing" onclick="setFilter('processing', this)">Processing</button>
+        <button type="button" class="filter-btn" data-filter="done" onclick="setFilter('done', this)">Done</button>
+        <button type="button" class="filter-btn" data-filter="error" onclick="setFilter('error', this)">Error</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS ROW -->
+  <div id="statsRow" class="stats-row" style="display:none;">
+    <div class="stats-grid">
+      <div class="card stat-card">
+        <div class="stat-num" id="statTotal">—</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-num" style="color:var(--pending);" id="statPending">—</div>
+        <div class="stat-label">Pending</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-num" style="color:var(--warning);" id="statProcessing">—</div>
+        <div class="stat-label">Processing</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-num" style="color:var(--success);" id="statDone">—</div>
+        <div class="stat-label">Done</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR STATE -->
+  <div id="errorState" style="display:none;" class="fade-in mt-2">
+    <div class="alert alert-error">
+      <span class="alert-icon">✕</span>
+      <div>
+        <strong>Failed to load media.</strong>
+        <span id="errorMsg"> Check that the API server is running.</span>
+        <br><span style="font-size:12px; opacity:0.7;">API: <span id="errorApi"></span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SKELETON LOADER -->
+  <div id="skeletonGrid" class="media-grid">
+    <div class="media-card skeleton-card" aria-hidden="true">
+      <div class="skeleton skeleton-thumb"></div>
+      <div class="skeleton-body">
+        <div class="skeleton skeleton-line"></div>
+        <div class="skeleton skeleton-line-sm"></div>
+      </div>
+    </div>
+    <div class="media-card skeleton-card" aria-hidden="true">
+      <div class="skeleton skeleton-thumb"></div>
+      <div class="skeleton-body">
+        <div class="skeleton" style="height:14px; width:60%; margin-bottom:10px;"></div>
+        <div class="skeleton" style="height:10px; width:50%;"></div>
+      </div>
+    </div>
+    <div class="media-card skeleton-card" aria-hidden="true">
+      <div class="skeleton skeleton-thumb"></div>
+      <div class="skeleton-body">
+        <div class="skeleton" style="height:14px; width:80%; margin-bottom:10px;"></div>
+        <div class="skeleton" style="height:10px; width:40%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REAL GRID -->
+  <div id="mediaGrid" class="media-grid" style="display:none;"></div>
+
+  <!-- EMPTY STATE -->
+  <div id="emptyState" style="display:none;" class="fade-in">
+    <div class="empty-state">
+      <div class="empty-icon">◫</div>
+      <div class="empty-title" id="emptyTitle">No media found</div>
+      <div class="empty-sub" id="emptySub">Upload your first file to get started</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:5000'; // ← change to your API URL
+
+  let allMedia = [];
+  let currentFilter = 'all';
+  let currentLoadAbort = null;
+
+  // Load on page open
+  loadMedia();
+
+  // Auto-refresh every 10 seconds if anything is still pending/processing
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    if (allMedia.some(m => ['pending','processing'].includes(m.status))) loadMedia();
+  }, 10000);
+
+  async function loadMedia() {
+    setRefreshing(true);
+    hideError();
+
+    if (currentLoadAbort) currentLoadAbort.abort();
+    currentLoadAbort = new AbortController();
+
+    try {
+      const res = await fetch(`${API_BASE}/list`, { signal: currentLoadAbort.signal });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Server returned ${res.status}`);
+      }
+
+      const data = await res.json();
+      // API may return { media: [...] } or { list: [...] } or directly [...]
+      allMedia = Array.isArray(data) ? data : (data.media || data.list || data.items || data.results || []);
+
+      updateStats();
+      renderGrid();
+      document.getElementById('statsRow').style.display = 'block';
+
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      showError(err);
+    } finally {
+      setRefreshing(false);
+      document.getElementById('skeletonGrid').style.display = 'none';
+    }
+  }
+
+  function renderGrid() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+    const filtered = allMedia.filter(m => {
+      const matchStatus = currentFilter === 'all' || m.status === currentFilter;
+      const hay = ((m.title || '') + ' ' + (m.description || '')).toLowerCase();
+      const matchSearch = !query || hay.includes(query);
+      return matchStatus && matchSearch;
+    });
+
+    const grid = document.getElementById('mediaGrid');
+    grid.style.display = '';
+
+    if (filtered.length === 0) {
+      grid.style.display = 'none';
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyTitle').textContent = currentFilter === 'all' && !query ? 'No media yet' : 'No results';
+      document.getElementById('emptySub').textContent = currentFilter === 'all' && !query
+        ? 'Upload your first file to get started'
+        : 'Try a different filter or search term';
+      return;
+    }
+
+    document.getElementById('emptyState').style.display = 'none';
+    grid.innerHTML = filtered.map(m => buildCard(m)).join('');
+  }
+
+  function buildCard(m) {
+    const id = m.id || m.media_id || m.mediaId;
+    const title = m.title || 'Untitled';
+    const status = m.status || 'pending';
+    const date = formatDate(m.created_at || m.createdAt || '');
+    const thumbUrl = resolveThumbnailUrl(m);
+    const isVideo = (m.file_type || m.fileType || m.content_type || '').startsWith('video');
+
+    const thumbHtml = thumbUrl
+      ? `<img src="${escHtml(thumbUrl)}" alt="${escHtml(title)}" loading="lazy" onerror="this.style.display='none'">`
+      : `<span class="media-thumb-icon">${isVideo ? '▶' : '▣'}</span>`;
+
+    const badgeClass = { pending:'badge-pending', processing:'badge-processing', done:'badge-done', error:'badge-error' }[status] || 'badge-pending';
+
+    return `
+      <a class="media-card fade-in" href="media-detail.html?id=${encodeURIComponent(id)}">
+        <div class="media-thumb">${thumbHtml}</div>
+        <div class="media-info">
+          <div class="media-name" title="${escHtml(title)}">${escHtml(title)}</div>
+          <div class="media-meta">
+            <span class="badge ${badgeClass}">${escHtml(status)}</span>
+            <span class="media-date">${date}</span>
+          </div>
+        </div>
+      </a>`;
+  }
+
+  function resolveThumbnailUrl(m) {
+    const directUrl = m.thumbnail_url || m.thumbnailUrl || '';
+    if (directUrl) return directUrl;
+
+    const thumbKey = m.thumbnail_key || m.thumbnailKey || '';
+    const id = m.id || m.media_id || m.mediaId;
+
+    // If the backend exposes a dedicated thumbnail URL, prefer returning that from /list.
+    // As a fallback, try a common pattern: /media?id=<id>&thumbnail=1
+    if (thumbKey && id) return `${API_BASE}/media?id=${encodeURIComponent(id)}&thumbnail=1`;
+    return '';
+  }
+
+  function updateStats() {
+    const counts = allMedia.reduce((acc, m) => { acc[m.status] = (acc[m.status]||0)+1; return acc; }, {});
+    document.getElementById('statTotal').textContent = allMedia.length;
+    document.getElementById('statPending').textContent = counts.pending || 0;
+    document.getElementById('statProcessing').textContent = counts.processing || 0;
+    document.getElementById('statDone').textContent = counts.done || 0;
+  }
+
+  function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderGrid();
+  }
+
+  function filterMedia() { renderGrid(); }
+
+  function setRefreshing(on) {
+    document.getElementById('refreshIcon').textContent = on ? '…' : '↻';
+    document.getElementById('refreshBtn').disabled = on;
+  }
+
+  function showError(err) {
+    document.getElementById('errorState').style.display = 'block';
+    document.getElementById('errorMsg').textContent = ' ' + (err.message || 'Unknown error.');
+    document.getElementById('errorApi').textContent = API_BASE + '/media';
+    document.getElementById('mediaGrid').style.display = 'none';
+  }
+  function hideError() { document.getElementById('errorState').style.display = 'none'; }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleDateString(); } catch { return ''; }
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

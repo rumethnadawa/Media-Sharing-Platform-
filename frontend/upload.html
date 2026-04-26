@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload — MediaShare</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="media-list.html" aria-label="MediaShare home">
+    <span class="logo-mark" aria-hidden="true"></span>
+    <span class="nav-logo">MediaShare</span>
+  </a>
+  <div class="nav-links">
+    <a href="upload.html" class="active">Upload</a>
+    <a href="media-list.html">Library</a>
+  </div>
+</nav>
+
+<div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-relevant="additions"></div>
+
+<div class="container">
+  <div class="page-header">
+    <h1 class="page-title">Upload media</h1>
+    <p class="page-sub">Share your photos and videos with the world.</p>
+  </div>
+
+  <!-- STEP 1: FORM -->
+  <div id="formSection" class="fade-in">
+    <div class="card">
+      <div class="field">
+        <label for="mediaTitle">Title</label>
+        <input type="text" id="mediaTitle" placeholder="e.g. Vacation photos 2024" maxlength="120" autocomplete="off" spellcheck="false">
+        <div class="field-hint">Give your upload a meaningful title</div>
+      </div>
+
+      <div class="field">
+        <label for="uploaderName">Uploader</label>
+        <input type="text" id="uploaderName" placeholder="Your name or ID" maxlength="80" autocomplete="name">
+      </div>
+
+      <div class="field">
+        <label for="mediaDesc">Description</label>
+        <textarea id="mediaDesc" placeholder="Optional details (context, location, notes…)" maxlength="500" rows="4" style="resize:vertical;"></textarea>
+        <div class="field-hint">Optional — stored as metadata</div>
+      </div>
+
+      <div class="field">
+        <label>File</label>
+        <div class="drop-zone" id="dropZone" aria-label="Choose a file to upload">
+          <div class="drop-icon">⬆</div>
+          <div class="drop-text"><strong>Click to choose</strong> or drag & drop</div>
+          <div class="drop-hint">Images (JPG, PNG, GIF, WEBP) · Videos (MP4, MOV, AVI) · Max 50MB</div>
+          <div class="file-chosen" id="fileChosen" style="display:none;"></div>
+          <input type="file" id="fileInput" accept="image/*,video/*">
+        </div>
+      </div>
+
+      <div id="alertBox" style="display:none;"></div>
+
+      <div class="flex items-center gap-3" style="margin-top:1.5rem;">
+        <button type="button" class="btn btn-primary" id="uploadBtn" onclick="handleUpload()">
+          <span id="btnText">Upload file</span>
+          <span id="btnSpinner" style="display:none;"><span class="spinner" style="width:14px;height:14px;border-width:2px;"></span></span>
+        </button>
+        <span class="text-sm text-muted" id="uploadStatus" aria-live="polite"></span>
+      </div>
+
+      <div id="progressSection" style="display:none; margin-top:1rem;">
+        <div class="progress-wrap">
+          <div class="progress-bar indeterminate" id="progressBar"></div>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:6px; font-family:var(--mono);" id="progressLabel">Uploading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: SUCCESS CONFIRMATION -->
+  <div id="successSection" style="display:none;" class="fade-in">
+    <div class="alert alert-success">
+      <span class="alert-icon">✓</span>
+      <div>
+        <strong>Upload successful!</strong> Your file is queued for processing.
+      </div>
+    </div>
+
+    <div class="card mt-2">
+      <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:1rem;">Upload details</div>
+
+      <div class="detail-row">
+        <span class="detail-key">Media ID</span>
+        <span class="id-chip" id="resultId" title="Click to copy" onclick="copyId()">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Title</span>
+        <span class="detail-val" id="resultTitle">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Uploader</span>
+        <span class="detail-val" id="resultUploader">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Description</span>
+        <span class="detail-val" id="resultDesc">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Status</span>
+        <span id="resultStatus"><span class="badge badge-pending">pending</span></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Uploaded at</span>
+        <span class="detail-val" id="resultTime">—</span>
+      </div>
+
+      <div class="flex gap-3 mt-3" style="flex-wrap:wrap;">
+        <a class="btn btn-primary" id="viewDetailBtn" href="#">Track processing →</a>
+        <button type="button" class="btn btn-ghost" onclick="resetForm()">Upload another</button>
+        <a class="btn btn-ghost" href="media-list.html">Go to library</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────────────────
+  // Change this to your real API base URL when deployed.
+  // Locally with Docker Compose it's typically http://localhost:5000
+  const API_BASE = 'http://localhost:5000';
+
+  // ── DRAG & DROP ─────────────────────────────────────────────────────────
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileChosen = document.getElementById('fileChosen');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const files = e.dataTransfer.files;
+    if (files.length) { fileInput.files = files; showFileChosen(files[0]); }
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) showFileChosen(fileInput.files[0]);
+  });
+
+  function showFileChosen(file) {
+    fileChosen.style.display = 'block';
+    fileChosen.textContent = `✓ ${file.name} (${formatBytes(file.size)})`;
+  }
+
+  // ── UPLOAD HANDLER ───────────────────────────────────────────────────────
+  async function handleUpload() {
+    clearAlert();
+    const title = document.getElementById('mediaTitle').value.trim();
+    const uploader = document.getElementById('uploaderName').value.trim();
+    const description = document.getElementById('mediaDesc').value.trim();
+    const file = fileInput.files[0];
+
+    // Validation
+    if (!title) return showAlert('error', 'Please enter a title for your media.');
+    if (!uploader) return showAlert('error', 'Please enter your name or uploader ID.');
+    if (!file) return showAlert('error', 'Please choose a file to upload.');
+    if (file.size > 50 * 1024 * 1024) return showAlert('error', 'File is too large. Maximum size is 50MB.');
+
+    setLoading(true);
+
+    try {
+      // Build form data — the API expects multipart/form-data
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('title', title);
+      formData.append('uploader', uploader);
+      formData.append('description', description);
+
+      const res = await fetch(`${API_BASE}/upload`, {
+        method: 'POST',
+        body: formData
+        // Do NOT set Content-Type header — browser sets it with the boundary automatically
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // API returned an error response
+        throw new Error(data.error || data.message || `Server error ${res.status}`);
+      }
+
+      // Show success
+      showSuccess(data, title, uploader, description);
+
+    } catch (err) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        showAlert('error', 'Cannot reach the API server. Make sure it is running at ' + API_BASE);
+      } else {
+        showAlert('error', err.message || 'Upload failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function showSuccess(data, title, uploader, description) {
+    // data = { id, title, uploader, status, created_at } — adjust field names to match your API
+    const mediaId = data.id || data.media_id || data.mediaId || '(unknown)';
+    const status = data.status || 'pending';
+    const createdAt = data.created_at || data.createdAt || new Date().toISOString();
+
+    document.getElementById('resultId').textContent = mediaId;
+    document.getElementById('resultId').dataset.id = mediaId;
+    document.getElementById('resultTitle').textContent = title;
+    document.getElementById('resultUploader').textContent = uploader;
+    document.getElementById('resultDesc').textContent = description || '—';
+    document.getElementById('resultTime').textContent = formatDate(createdAt);
+
+    const badgeClass = status === 'done' ? 'badge-done' : status === 'processing' ? 'badge-processing' : 'badge-pending';
+    document.getElementById('resultStatus').innerHTML = `<span class="badge ${badgeClass}">${status}</span>`;
+
+    document.getElementById('viewDetailBtn').href = `media-detail.html?id=${encodeURIComponent(mediaId)}`;
+
+    document.getElementById('formSection').style.display = 'none';
+    document.getElementById('successSection').style.display = 'block';
+    document.getElementById('successSection').classList.add('fade-in');
+    showToast('success', 'Upload successful!');
+  }
+
+  function resetForm() {
+    document.getElementById('formSection').style.display = 'block';
+    document.getElementById('successSection').style.display = 'none';
+    document.getElementById('mediaTitle').value = '';
+    document.getElementById('uploaderName').value = '';
+    document.getElementById('mediaDesc').value = '';
+    fileInput.value = '';
+    fileChosen.style.display = 'none';
+    clearAlert();
+  }
+
+  function copyId() {
+    const id = document.getElementById('resultId').dataset.id;
+    if (!id) return;
+    navigator.clipboard.writeText(id).then(() => showToast('success', 'ID copied!'));
+  }
+
+  // ── UI HELPERS ───────────────────────────────────────────────────────────
+  function setLoading(on) {
+    const btn = document.getElementById('uploadBtn');
+    btn.disabled = on;
+    document.getElementById('btnText').textContent = on ? 'Uploading…' : 'Upload file';
+    document.getElementById('btnSpinner').style.display = on ? 'inline' : 'none';
+    document.getElementById('progressSection').style.display = on ? 'block' : 'none';
+  }
+
+  function showAlert(type, msg) {
+    const el = document.getElementById('alertBox');
+    el.style.display = 'block';
+    el.innerHTML = `<div class="alert alert-${type}"><span class="alert-icon">${type === 'error' ? '✕' : '✓'}</span><span>${msg}</span></div>`;
+  }
+  function clearAlert() {
+    const el = document.getElementById('alertBox');
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
+
+  function showToast(type, msg) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : '✕'}</span><span>${msg}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function formatDate(iso) {
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  }
+</script>
+</body>
+</html>
