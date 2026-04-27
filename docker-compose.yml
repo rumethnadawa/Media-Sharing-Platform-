@@ -1,0 +1,91 @@
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  MediaShare — docker-compose.yml                                     ║
+# ║  CS4092 Distributed Systems — Group A                                ║
+# ║  DevOps: KKVRM Kalyanapriya                                          ║
+# ╠══════════════════════════════════════════════════════════════════════╣
+# ║  HOW TO RUN:                                                          ║
+# ║    docker compose up --build        ← first time                     ║
+# ║    docker compose up                ← after first time               ║
+# ║    docker compose down              ← stop everything                ║
+# ║    docker compose logs -f backend   ← watch backend logs             ║
+# ║                                                                       ║
+# ║  WHAT YOU GET:                                                        ║
+# ║    Frontend UI  → http://localhost:8080                               ║
+# ║    Backend API  → http://localhost:5000  (also at /api/ on 8080)     ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+# All services talk to each other on this internal network
+# They refer to each other by service name e.g. "backend", "frontend"
+networks:
+  mediashare-net:
+    driver: bridge
+
+# Named volume so the JSON database file survives container restarts
+volumes:
+  media-data:
+
+services:
+
+  # ── BACKEND (Flask API) ──────────────────────────────────────────────────
+  # Runs: gunicorn app.main:app on port 5000
+  # Endpoints: /health  /api/upload  /api/list  /api/status/<id>  /api/stats
+  backend:
+    build:
+      context: ./backend        # ← this is the backend/ folder
+      dockerfile: Dockerfile
+    container_name: mediashare-backend
+    restart: unless-stopped
+    networks:
+      - mediashare-net
+    ports:
+      - "5000:5000"             # Access directly: http://localhost:5000
+    volumes:
+      # Mount a volume so media_db.json persists even when container restarts
+      - media-data:/app/data
+    environment:
+      # ── Flask settings ──────────────────────────────────────────────
+      FLASK_ENV: development
+      DEBUG: "False"
+      PORT: "5000"
+      LOG_LEVEL: INFO
+
+      # ── Database: JSON file stored in the mounted volume ────────────
+      DB_FILE: /app/data/media_db.json
+      DB_TYPE: mock             # uses MockDynamoDB locally
+
+      # ── AWS (used when switching to real cloud — leave blank for now) ──
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-media-sharing-bucket}
+      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME:-media-processing-queue}
+      DYNAMODB_TABLE_NAME: ${DYNAMODB_TABLE_NAME:-Media}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ── FRONTEND (nginx serving HTML/CSS) ────────────────────────────────────
+  # Serves the 4 HTML/CSS files + proxies /api/* calls to the backend
+  # Open http://localhost:8080 in your browser
+  frontend:
+    build:
+      context: ./frontend       # ← this is the frontend/ folder
+      dockerfile: Dockerfile
+    container_name: mediashare-frontend
+    restart: unless-stopped
+    networks:
+      - mediashare-net
+    ports:
+      - "8080:80"               # Open: http://localhost:8080
+    depends_on:
+      backend:
+        condition: service_healthy   # Wait until backend passes its health check
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

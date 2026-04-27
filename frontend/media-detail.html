@@ -32,6 +32,9 @@
     </div>
     <div class="page-actions">
       <a class="btn btn-ghost text-sm" href="media-list.html">← Back</a>
+      <button type="button" class="btn btn-ghost text-sm" id="shareBtn" onclick="shareMedia()">Share URL</button>
+      <button type="button" class="btn btn-ghost text-sm" id="downloadBtn" onclick="downloadMedia()">Download</button>
+      <button type="button" class="btn btn-ghost text-sm" style="color: var(--error);" id="deleteBtn" onclick="deleteMedia()">Delete</button>
       <button type="button" class="btn btn-primary text-sm" id="refreshBtn" onclick="loadDetail()">
         <span id="refreshIcon">↻</span> Refresh
       </button>
@@ -93,7 +96,7 @@
 </div>
 
 <script>
-  const API_BASE = 'http://localhost:5000'; // ← change to your API URL
+  const API_BASE = '';
 
   const qs = new URLSearchParams(location.search);
   const mediaId = qs.get('id');
@@ -277,6 +280,36 @@
     const id = document.getElementById('idChip').dataset.id;
     if (!id) return;
     navigator.clipboard.writeText(id).then(() => showToast('success', 'ID copied!'));
+  }
+
+  function shareMedia() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => showToast('success', 'URL copied to clipboard!'));
+  }
+
+  function downloadMedia() {
+    if (!mediaId) return;
+    window.location.href = `${API_BASE}/download/${encodeURIComponent(mediaId)}`;
+  }
+
+  async function deleteMedia() {
+    if (!mediaId) return;
+    if (!confirm('Are you sure you want to delete this media?')) return;
+    
+    try {
+      const res = await fetch(`${API_BASE}/media/${encodeURIComponent(mediaId)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to delete media');
+      
+      showToast('success', 'Media deleted successfully');
+      setTimeout(() => {
+        window.location.href = 'media-list.html';
+      }, 1000);
+    } catch (err) {
+      showToast('error', err.message);
+    }
   }
 
   function showToast(type, msg) {

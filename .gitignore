@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Local runtime artifacts
+backend/uploads/
+backend/test_upload.png
+backend/media_db.json
+backend/simulation_test_db.json
+
+# Logs
+*.log
