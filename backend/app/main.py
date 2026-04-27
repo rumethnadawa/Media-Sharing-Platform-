@@ -318,8 +318,25 @@ def download_media(media_id):
         if not success or not media:
             return jsonify({'success': False, 'error': msg}), 404
 
-        filename = media.object_key
-        return send_from_directory(UPLOADS_DIR, filename, as_attachment=True)
+        filename = media.object_key  # e.g. "rumeth_photo.jpg"
+
+        # Strip the uploader prefix so the saved file has its original name
+        # object_key format: "<uploader>_<original_filename>"
+        if '_' in filename:
+            original_name = filename.split('_', 1)[1]
+        else:
+            original_name = filename
+
+        # Detect mimetype from the original filename extension
+        content_type = mimetypes.guess_type(original_name)[0] or 'application/octet-stream'
+
+        return send_from_directory(
+            UPLOADS_DIR,
+            filename,
+            as_attachment=True,
+            download_name=original_name,  # browser saves with this name
+            mimetype=content_type
+        )
     except Exception as e:
         logger.error(f"Error downloading media: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

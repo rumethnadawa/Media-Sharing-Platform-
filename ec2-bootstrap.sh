@@ -70,8 +70,8 @@ cd "$APP_DIR/Media-Sharing-Platform-"   # adjust if your repo root differs
 cat > .env << 'ENV'
 DB_TYPE=dynamodb
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=KIA3CHPOL3E5AV7PZQ4
-AWS_SECRET_ACCESS_KEY=+e+rsvi0oU2zHAkEwWers2ISlJnRGGW8BMRAshZu
+AWS_ACCESS_KEY_ID=REPLACE_WITH_YOUR_KEY
+AWS_SECRET_ACCESS_KEY=REPLACE_WITH_YOUR_SECRET
 DYNAMODB_TABLE_NAME=MediaMetadata
 S3_BUCKET=group-a-media-bucket-kdu
 SQS_QUEUE_NAME=media-processing-queue
