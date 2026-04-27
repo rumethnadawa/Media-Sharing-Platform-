@@ -284,7 +284,35 @@
 
   function shareMedia() {
     const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => showToast('success', 'URL copied to clipboard!'));
+
+    // navigator.clipboard only works on HTTPS — use textarea fallback for HTTP
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url)
+        .then(() => showToast('success', 'Share link copied to clipboard!'))
+        .catch(() => fallbackCopyUrl(url));
+    } else {
+      fallbackCopyUrl(url);
+    }
+  }
+
+  function fallbackCopyUrl(url) {
+    // Create a temporary textarea, copy text from it, then remove it
+    const el = document.createElement('textarea');
+    el.value = url;
+    el.style.position = 'fixed';
+    el.style.left = '-9999px';
+    el.style.top = '-9999px';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    try {
+      document.execCommand('copy');
+      showToast('success', 'Share link copied to clipboard!');
+    } catch (err) {
+      // Last resort — show URL in a prompt so user can copy manually
+      prompt('Copy this share link:', url);
+    }
+    document.body.removeChild(el);
   }
 
   function downloadMedia() {
