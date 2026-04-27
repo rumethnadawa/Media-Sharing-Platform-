@@ -23,3 +23,6 @@ backend/simulation_test_db.json
 
 # Logs
 *.log
+
+# AWS credentials / secrets — NEVER commit this
+.env

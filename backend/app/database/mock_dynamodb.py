@@ -67,6 +67,7 @@ class MockDynamoDB:
             True if successful, False otherwise
         """
         try:
+            self.load_from_file()  # Reload first to avoid overwriting sibling worker writes
             self.data[item_id] = item
             self.save_to_file()
             logger.info(f"Put item: {item_id}")
@@ -86,6 +87,7 @@ class MockDynamoDB:
             Item data or None if not found
         """
         try:
+            self.load_from_file()  # Always read fresh from disk
             item = self.data.get(item_id)
             if item:
                 logger.info(f"Got item: {item_id}")
@@ -108,6 +110,7 @@ class MockDynamoDB:
             True if successful, False if item not found
         """
         try:
+            self.load_from_file()  # Reload first to avoid overwriting sibling worker writes
             if item_id not in self.data:
                 logger.warning(f"Item not found for update: {item_id}")
                 return False
@@ -135,6 +138,7 @@ class MockDynamoDB:
             True if successful, False if item not found
         """
         try:
+            self.load_from_file()  # Reload first to avoid overwriting sibling worker writes
             if item_id in self.data:
                 del self.data[item_id]
                 self.save_to_file()
@@ -155,6 +159,7 @@ class MockDynamoDB:
             List of all items
         """
         try:
+            self.load_from_file()  # Always read fresh from disk
             items = list(self.data.values())
             logger.info(f"Scanned {len(items)} items")
             return items
@@ -173,6 +178,7 @@ class MockDynamoDB:
             List of items with matching status
         """
         try:
+            self.load_from_file()  # Always read fresh from disk
             items = [item for item in self.data.values() if item.get('status') == status]
             logger.info(f"Queried {len(items)} items with status: {status}")
             return items
@@ -191,6 +197,7 @@ class MockDynamoDB:
             List of items uploaded by the specified user
         """
         try:
+            self.load_from_file()  # Always read fresh from disk
             items = [item for item in self.data.values() if item.get('uploader') == uploader]
             logger.info(f"Queried {len(items)} items by uploader: {uploader}")
             return items
@@ -200,6 +207,7 @@ class MockDynamoDB:
 
     def count(self) -> int:
         """Get total count of items."""
+        self.load_from_file()  # Always read fresh from disk
         return len(self.data)
 
     def clear(self):

@@ -51,4 +51,4 @@ HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
 # ── Start command ─────────────────────────────────────────────────────────
 # Using gunicorn for production-style serving
 # "app.main:app" means: file=app/main.py, Flask object=app
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "app.main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "120", "--access-logfile", "-", "app.main:app"]

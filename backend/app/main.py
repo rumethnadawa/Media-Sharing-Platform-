@@ -24,7 +24,7 @@ FRONTEND_DIR = os.path.join(REPO_DIR, 'frontend')
 UPLOADS_DIR = os.path.join(BACKEND_DIR, 'uploads')
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-from app.database import MockDynamoDB
+from app.database import MockDynamoDB, RealDynamoDB
 from app.services import MediaService
 from app.utils import MockSQS
 from app.config import *
@@ -40,11 +40,23 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
-# Initialize backend components
-db_file_path = DB_FILE
-if not os.path.isabs(db_file_path):
-    db_file_path = os.path.join(BACKEND_DIR, db_file_path)
-db = MockDynamoDB(storage_file=db_file_path)
+# ── Database factory ─────────────────────────────────────────────────────
+# DB_TYPE=dynamodb → real AWS DynamoDB
+# DB_TYPE=mock     → local JSON file (default / fallback)
+if DB_TYPE == 'dynamodb':
+    try:
+        db = RealDynamoDB()
+        logger.info("Database: AWS DynamoDB ('%s')", DYNAMODB_TABLE_NAME)
+    except Exception as exc:
+        logger.critical("Failed to connect to AWS DynamoDB: %s", exc)
+        raise SystemExit(1) from exc
+else:
+    db_file_path = DB_FILE
+    if not os.path.isabs(db_file_path):
+        db_file_path = os.path.join(BACKEND_DIR, db_file_path)
+    db = MockDynamoDB(storage_file=db_file_path)
+    logger.info("Database: MockDynamoDB (local JSON @ %s)", db_file_path)
+
 media_service = MediaService(db)
 queue = MockSQS()
 
