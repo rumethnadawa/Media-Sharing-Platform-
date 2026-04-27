@@ -26,3 +26,6 @@ backend/simulation_test_db.json
 
 # AWS credentials / secrets — NEVER commit this
 .env
+
+# EC2 bootstrap script contains real AWS keys — keep local only
+ec2-bootstrap.sh
