@@ -160,17 +160,17 @@ python simulation/run_simulation.py
 Backend supports these operations:
 
 ```
-POST /upload
+POST /api/upload
   → service.create_media()
   → Queue message sent
 
-GET /list
+GET /api/list
   → service.list_all_media()
 
-GET /status?id=<media_id>
+GET /api/status/<media_id>
   → service.get_media()
 
-GET /stats
+GET /api/stats
   → service.get_statistics()
 ```
 
@@ -178,8 +178,7 @@ GET /stats
 
 - `docs/BACKEND_GUIDE.md` - Complete backend documentation
 - `docs/INTEGRATION_GUIDE.md` - Integration guide for all team members
-- `docs/DATABASE_SCHEMA.md` - Database schema design
-- `docs/API_INTEGRATION.md` - API integration details
+- `docs/API_DEVELOPER_GUIDE.md` - API developer implementation guide
 
 ### Key Features
 

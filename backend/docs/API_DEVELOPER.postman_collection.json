@@ -1,0 +1,190 @@
+{
+  "info": {
+    "_postman_id": "2e1f2f53-6d3e-4d7f-9d9c-1a9a7bfa5d31",
+    "name": "Media Sharing Platform - API Developer",
+    "description": "Postman collection for testing the Media Sharing Platform API endpoints used by the API Developer role.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Checks whether the backend service is running."
+      },
+      "response": []
+    },
+    {
+      "name": "List All Media",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/list",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "list"
+          ]
+        },
+        "description": "Returns all media records in the system."
+      },
+      "response": []
+    },
+    {
+      "name": "List Media by Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/list?status=pending",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "list"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending"
+            }
+          ]
+        },
+        "description": "Filters media records by processing status."
+      },
+      "response": []
+    },
+    {
+      "name": "List Media by Uploader",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/list?uploader=user1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "list"
+          ],
+          "query": [
+            {
+              "key": "uploader",
+              "value": "user1"
+            }
+          ]
+        },
+        "description": "Filters media records by uploader name."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Statistics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/stats",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "stats"
+          ]
+        },
+        "description": "Returns counts for pending, processing, done, error, and total file size."
+      },
+      "response": []
+    },
+    {
+      "name": "Upload Media",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "title",
+              "value": "Demo",
+              "type": "text"
+            },
+            {
+              "key": "uploader",
+              "value": "You",
+              "type": "text"
+            },
+            {
+              "key": "description",
+              "value": "sample upload",
+              "type": "text"
+            },
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/upload",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "upload"
+          ]
+        },
+        "description": "Uploads a media file and creates the corresponding metadata record. Select a real file in the file field before sending."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Media Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/status/{{media_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "status",
+            "{{media_id}}"
+          ]
+        },
+        "description": "Gets the full media record for a specific media ID. Replace the media_id variable with a real ID from the upload response."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "media_id",
+      "value": ""
+    }
+  ]
+}

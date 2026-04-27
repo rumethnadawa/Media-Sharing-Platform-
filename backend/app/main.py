@@ -7,6 +7,8 @@ from flask import Flask, request, jsonify
 import logging
 import sys
 import os
+import uuid
+from werkzeug.utils import secure_filename
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -33,6 +35,50 @@ media_service = MediaService(db)
 queue = MockSQS()
 
 logger.info(f"Backend initialized - Service Version: {SERVICE_VERSION}")
+
+
+def is_allowed_file(filename: str) -> bool:
+    """Validate upload file extension."""
+    if not filename or '.' not in filename:
+        return False
+    extension = filename.rsplit('.', 1)[1].lower()
+    return extension in ALLOWED_EXTENSIONS
+
+
+def detect_media_type(content_type: str) -> str:
+    """Detect media type from MIME content type."""
+    if not content_type:
+        return None
+    if content_type.startswith('image/'):
+        return 'image'
+    if content_type.startswith('video/'):
+        return 'video'
+    return None
+
+
+def save_uploaded_file(file_obj) -> tuple:
+    """
+    Save uploaded file to local storage and return object_key and size.
+
+    Returns:
+        Tuple[str, int]: (object_key, file_size)
+    """
+    uploads_dir = os.path.join(os.path.dirname(__file__), '..', 'uploads')
+    uploads_dir = os.path.abspath(uploads_dir)
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    original_name = secure_filename(file_obj.filename)
+    unique_name = f"{uuid.uuid4()}_{original_name}"
+    local_path = os.path.join(uploads_dir, unique_name)
+
+    # Read exact file size from stream before saving.
+    file_obj.stream.seek(0, os.SEEK_END)
+    file_size = file_obj.stream.tell()
+    file_obj.stream.seek(0)
+
+    file_obj.save(local_path)
+    object_key = f"s3://{S3_BUCKET}/uploads/{unique_name}"
+    return object_key, file_size
 
 
 # Health Check Endpoint
@@ -91,8 +137,13 @@ def list_media():
     try:
         status_filter = request.args.get('status')
         uploader_filter = request.args.get('uploader')
-        
-        if status_filter:
+
+        if status_filter and uploader_filter:
+            success, media_list, msg = media_service.list_media_by_status(status_filter)
+            if success:
+                media_list = [m for m in media_list if m.uploader == uploader_filter]
+                msg = f"Found {len(media_list)} media records"
+        elif status_filter:
             success, media_list, msg = media_service.list_media_by_status(status_filter)
         elif uploader_filter:
             success, media_list, msg = media_service.list_media_by_uploader(uploader_filter)
@@ -106,6 +157,11 @@ def list_media():
                 'media': [m.to_dict() for m in media_list]
             }), 200
         else:
+            if 'Invalid status' in msg:
+                return jsonify({
+                    'success': False,
+                    'error': msg
+                }), 400
             return jsonify({
                 'success': False,
                 'error': msg
@@ -145,30 +201,48 @@ def get_media_status(media_id):
         }), 500
 
 
-# Placeholder: Upload Endpoint (to be implemented by API Developer)
 @app.route('/api/upload', methods=['POST'])
 def upload_media():
-    """
-    Upload media file and create metadata record.
-    This is a placeholder - implement with actual file handling.
-    """
+    """Upload media file and create metadata record."""
     try:
-        # Expected form data: title, uploader, file, description (optional)
+        # Expected form-data: file, title, uploader, description (optional)
         title = request.form.get('title')
         uploader = request.form.get('uploader')
         description = request.form.get('description')
-        
-        # For now, create without file (file handling to be added)
+
         if not title or not uploader:
             return jsonify({
                 'success': False,
                 'error': 'title and uploader are required'
             }), 400
-        
-        # Simulate S3 upload (actual implementation in API layer)
-        object_key = f"s3://bucket/uploads/{title.lower()}"
-        file_size = 1000  # Placeholder
-        media_type = 'video'  # Placeholder
+
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'file is required'
+            }), 400
+
+        file_obj = request.files['file']
+        if not file_obj or not file_obj.filename:
+            return jsonify({
+                'success': False,
+                'error': 'valid file is required'
+            }), 400
+
+        if not is_allowed_file(file_obj.filename):
+            return jsonify({
+                'success': False,
+                'error': f'unsupported file extension. allowed: {ALLOWED_EXTENSIONS}'
+            }), 400
+
+        media_type = detect_media_type(file_obj.content_type)
+        if media_type is None:
+            return jsonify({
+                'success': False,
+                'error': 'unsupported MIME type. use image/* or video/*'
+            }), 400
+
+        object_key, file_size = save_uploaded_file(file_obj)
         
         success, media, msg = media_service.create_media(
             title=title,
@@ -180,12 +254,22 @@ def upload_media():
         )
         
         if success:
-            # Send processing job to queue
-            queue.send_message({
-                'media_id': media.media_id,
-                'object_key': media.object_key,
-                'action': 'generate_thumbnail'
-            })
+            try:
+                # Send processing job after metadata creation succeeds.
+                queue.send_message({
+                    'media_id': media.media_id,
+                    'object_key': media.object_key,
+                    'action': 'generate_thumbnail'
+                })
+            except Exception as queue_error:
+                media_service.update_media_processing(
+                    media.media_id,
+                    error_message=f"Queue dispatch failed: {queue_error}"
+                )
+                return jsonify({
+                    'success': False,
+                    'error': f'queue dispatch failed: {queue_error}'
+                }), 500
             
             return jsonify({
                 'success': True,
@@ -225,6 +309,15 @@ def internal_error(error):
         'success': False,
         'error': 'Internal server error'
     }), 500
+
+
+@app.errorhandler(413)
+def payload_too_large(error):
+    """Handle oversized file uploads."""
+    return jsonify({
+        'success': False,
+        'error': f'file too large. max allowed is {MAX_FILE_SIZE} bytes'
+    }), 413
 
 
 if __name__ == '__main__':
