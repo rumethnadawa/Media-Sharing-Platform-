@@ -14,7 +14,7 @@ COPY media-list.html    /usr/share/nginx/html/media-list.html
 COPY media-detail.html  /usr/share/nginx/html/media-detail.html
 COPY style.css          /usr/share/nginx/html/style.css
 
-# Copy our custom nginx config (handles routing + API proxy)
+# Copy custom nginx config (handles routing + API proxy)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Nginx serves on port 80 → mapped to 8080 on your machine
