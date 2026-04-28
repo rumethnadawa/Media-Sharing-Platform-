@@ -1,4 +1,4 @@
-# ── MediaShare Frontend — Dockerfile ───────────────────────────────────────
+# MediaShare Frontend — Dockerfile 
 # Frontend/DevOps: KKVRM Kalyanapriya
 #
 # Uses nginx to serve the 4 static HTML/CSS files
