@@ -127,12 +127,12 @@
 </div>
 
 <script>
-  // ── CONFIG ──────────────────────────────────────────────────────────────
+  //  CONFIG 
   // Change this to your real API base URL when deployed.
   // Locally with Docker Compose it's typically http://localhost:5000
   const API_BASE = '';
 
-  // ── DRAG & DROP ─────────────────────────────────────────────────────────
+  // DRAG & DROP 
   const dropZone = document.getElementById('dropZone');
   const fileInput = document.getElementById('fileInput');
   const fileChosen = document.getElementById('fileChosen');
@@ -154,7 +154,7 @@
     fileChosen.textContent = `✓ ${file.name} (${formatBytes(file.size)})`;
   }
 
-  // ── UPLOAD HANDLER ───────────────────────────────────────────────────────
+  // UPLOAD HANDLER
   async function handleUpload() {
     clearAlert();
     const title = document.getElementById('mediaTitle').value.trim();
@@ -246,7 +246,7 @@
     navigator.clipboard.writeText(id).then(() => showToast('success', 'ID copied!'));
   }
 
-  // ── UI HELPERS ───────────────────────────────────────────────────────────
+  // UI HELPERS
   function setLoading(on) {
     const btn = document.getElementById('uploadBtn');
     btn.disabled = on;
